@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Echos — AI meeting & voice-memo assistant</title>
+<style>
+  :root{
+    --ink:#1c1a17; --paper:#f6f3ec; --paper-raised:#ffffff; --line:#ddd6c7;
+    --accent:#4a5d4e; --accent-soft:#c9d4c9; --warn:#8b4a3d;
+    font-family:"Iowan Old Style","Georgia",serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --ink:#e9e5db; --paper:#17181a; --paper-raised:#1f2022; --line:#33352f; --accent:#8fae94; --accent-soft:#2a3730; --warn:#c77a67; }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);}
+  body{-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:800px;margin:0 auto;padding:48px 28px 80px;}
+  header{margin-bottom:40px;}
+  .mark{font-family:"Helvetica Neue",Arial,sans-serif;font-size:12px;letter-spacing:.14em;color:var(--accent);margin:0 0 6px;}
+  h1{font-size:2.3rem;line-height:1.1;margin:0 0 10px;font-weight:600;letter-spacing:-.01em;}
+  .sub{font-family:"Helvetica Neue",Arial,sans-serif;font-size:15px;opacity:.68;max-width:52ch;line-height:1.55;margin:0;}
+
+  .panel{background:var(--paper-raised);border:1px solid var(--line);border-radius:3px;padding:26px;margin-bottom:20px;}
+  .panel h2{font-family:"Helvetica Neue",Arial,sans-serif;font-size:12.5px;letter-spacing:.06em;font-weight:700;margin:0 0 16px;opacity:.8;}
+
+  label{font-family:"Helvetica Neue",Arial,sans-serif;font-size:12.5px;opacity:.7;display:block;margin-bottom:6px;}
+  input[type=password], input[type=text]{
+    width:100%; font-family:"Helvetica Neue",Arial,sans-serif; font-size:14px;
+    padding:11px 12px; border:1px solid var(--line); border-radius:2px; background:transparent; color:var(--ink);
+  }
+  .keyrow{display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;}
+  .keyrow > div:first-child{flex:1; min-width:220px;}
+  .save-btn, .link-btn{
+    font-family:"Helvetica Neue",Arial,sans-serif; font-size:13px; font-weight:600;
+    padding:11px 16px; border-radius:2px; cursor:pointer; border:1px solid var(--line); background:transparent; color:var(--ink);
+  }
+  .keystatus{font-family:"Helvetica Neue",Arial,sans-serif;font-size:12px;margin-top:8px;opacity:.6;}
+  .keystatus.ok{color:var(--accent); opacity:1;}
+  a.gethelp{color:var(--accent);}
+
+  .record-row{display:flex; align-items:center; gap:16px; flex-wrap:wrap;}
+  button.rec{
+    font-family:"Helvetica Neue",Arial,sans-serif; background:var(--accent); color:#fff;
+    border:none; border-radius:999px; padding:13px 24px; font-size:14px; font-weight:600; cursor:pointer;
+    display:inline-flex; align-items:center; gap:9px;
+  }
+  button.rec.stop{background:var(--warn);}
+  button.rec[disabled]{opacity:.4; cursor:not-allowed;}
+  .dot{width:9px;height:9px;border-radius:50%;background:currentColor;}
+  .dot.live{animation:pulse 1.1s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.25;}}
+  .timer{font-family:"Helvetica Neue",Arial,sans-serif;font-variant-numeric:tabular-nums;font-size:14px;opacity:.6;}
+  .upload{font-family:"Helvetica Neue",Arial,sans-serif;font-size:13px;color:var(--accent);text-decoration:underline;cursor:pointer;background:none;border:none;padding:0;}
+  .filename{font-family:"Helvetica Neue",Arial,sans-serif;font-size:12.5px;opacity:.6;margin-top:10px;}
+
+  .actions{display:flex; gap:10px; margin-top:18px; flex-wrap:wrap;}
+  button.primary{font-family:"Helvetica Neue",Arial,sans-serif;background:var(--ink);color:var(--paper);border:none;border-radius:2px;padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer;}
+  button.primary[disabled]{opacity:.35;cursor:not-allowed;}
+  button.ghost{font-family:"Helvetica Neue",Arial,sans-serif;background:transparent;color:var(--ink);opacity:.6;border:1px solid var(--line);border-radius:2px;padding:12px 20px;font-size:13px;cursor:pointer;}
+
+  .stage{font-family:"Helvetica Neue",Arial,sans-serif;font-size:13px;opacity:.65;display:flex;align-items:center;gap:10px;margin-top:14px;}
+  .spinner{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);animation:spin .8s linear infinite;flex:none;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .error{font-family:"Helvetica Neue",Arial,sans-serif;font-size:13px;color:var(--warn);margin-top:12px;line-height:1.5;}
+
+  .transcript{font-size:15.5px;line-height:1.75;white-space:pre-wrap;min-height:30px;}
+  .placeholder{opacity:.4;font-style:italic;font-family:"Helvetica Neue",Arial,sans-serif;font-size:13.5px;}
+
+  .summary-block{margin-bottom:20px;}
+  .summary-block:last-child{margin-bottom:0;}
+  .summary-block h3{font-family:"Helvetica Neue",Arial,sans-serif;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);margin:0 0 10px;font-weight:700;}
+  .summary-block p{margin:0;line-height:1.7;font-size:15px;}
+  ul.tasks, ul.points{margin:0;padding:0;list-style:none;}
+  ul.tasks li, ul.points li{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14.5px;line-height:1.5;}
+  ul.tasks li:last-child, ul.points li:last-child{border-bottom:none;}
+  ul.tasks li::before, ul.points li::before{content:"—";opacity:.4;flex:none;}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip{font-family:"Helvetica Neue",Arial,sans-serif;font-size:12px;border:1px solid var(--line);border-radius:999px;padding:5px 12px;opacity:.75;}
+
+  footer{font-family:"Helvetica Neue",Arial,sans-serif;font-size:11px;opacity:.4;margin-top:36px;text-align:center;}
+  .badge{display:inline-block;font-family:"Helvetica Neue",Arial,sans-serif;font-size:10.5px;letter-spacing:.04em;background:var(--accent-soft);color:var(--accent);border-radius:3px;padding:3px 8px;margin-left:8px;vertical-align:middle;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="mark">ECHOS</p>
+    <h1>A meeting spoken,<br>a record written.</h1>
+    <p class="sub">Record a memo or upload an audio file. Echos sends it to AssemblyAI for real transcription, then returns a summary, key points, and sentiment — right in your browser.</p>
+  </header>
+
+  <div class="panel">
+    <h2>ASSEMBLYAI API KEY</h2>
+    <div class="keyrow">
+      <div>
+        <label for="apiKey">Your API key (stored only in this browser tab)</label>
+        <input type="password" id="apiKey" placeholder="Paste your AssemblyAI API key" autocomplete="off">
+      </div>
+      <button class="save-btn" id="saveKey">Save key</button>
+    </div>
+    <p class="keystatus" id="keyStatus">No key saved yet — get a free one at <a class="gethelp" href="https://www.assemblyai.com/dashboard/signup" target="_blank" rel="noopener">assemblyai.com</a> (free tier, no card required).</p>
+  </div>
+
+  <div class="panel">
+    <h2>AUDIO INPUT</h2>
+    <div class="record-row">
+      <button class="rec" id="recBtn">
+        <span class="dot" id="recDot"></span>
+        <span id="recLabel">Start recording</span>
+      </button>
+      <span class="timer" id="timer">00:00</span>
+      <button class="upload" id="uploadBtn">or upload an audio file</button>
+      <input type="file" id="fileInput" accept="audio/*" style="display:none;">
+    </div>
+    <p class="filename" id="filename"></p>
+    <div class="actions">
+      <button class="primary" id="analyzeBtn" disabled>Transcribe & analyze</button>
+      <button class="ghost" id="clearBtn">Clear</button>
+    </div>
+    <div id="stageArea"></div>
+  </div>
+
+  <div class="panel" id="transcriptPanel" style="display:none;">
+    <h2>TRANSCRIPT <span class="badge" id="confBadge"></span></h2>
+    <div class="transcript" id="transcript"></div>
+  </div>
+
+  <div class="panel" id="summaryPanel" style="display:none;">
+    <h2>AI SUMMARY</h2>
+    <div class="summary-block">
+      <h3>Summary</h3>
+      <p id="summaryText"></p>
+    </div>
+    <div class="summary-block" id="highlightsBlock">
+      <h3>Key phrases</h3>
+      <div class="chips" id="chips"></div>
+    </div>
+    <div class="summary-block">
+      <h3>Overall sentiment</h3>
+      <p id="sentimentText"></p>
+    </div>
+  </div>
+
+  <footer>Echos — built solo for the AssemblyAI Voice Agent Hackathon · transcription &amp; analysis powered by the AssemblyAI API</footer>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const apiKeyInput = $('apiKey'), saveKeyBtn = $('saveKey'), keyStatus = $('keyStatus');
+  const recBtn = $('recBtn'), recDot = $('recDot'), recLabel = $('recLabel'), timerEl = $('timer');
+  const uploadBtn = $('uploadBtn'), fileInput = $('fileInput'), filenameEl = $('filename');
+  const analyzeBtn = $('analyzeBtn'), clearBtn = $('clearBtn'), stageArea = $('stageArea');
+  const transcriptPanel = $('transcriptPanel'), transcriptEl = $('transcript'), confBadge = $('confBadge');
+  const summaryPanel = $('summaryPanel'), summaryText = $('summaryText'), chipsEl = $('chips'), sentimentText = $('sentimentText');
+
+  let apiKey = '';
+  let mediaRecorder = null, recordedChunks = [], audioBlob = null;
+  let recognizingTimer = null, seconds = 0;
+
+  function fmt(s){ const m=Math.floor(s/60).toString().padStart(2,'0'); const sec=(s%60).toString().padStart(2,'0'); return m+':'+sec; }
+
+  saveKeyBtn.addEventListener('click', function(){
+    apiKey = apiKeyInput.value.trim();
+    if(apiKey){
+      keyStatus.textContent = 'Key saved for this session.';
+      keyStatus.classList.add('ok');
+    } else {
+      keyStatus.textContent = 'Paste a valid key first.';
+      keyStatus.classList.remove('ok');
+    }
+  });
+
+  recBtn.addEventListener('click', async function(){
+    if(mediaRecorder && mediaRecorder.state === 'recording'){
+      mediaRecorder.stop();
+      return;
+    }
+    try{
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordedChunks = [];
+      const mime = (window.MediaRecorder && MediaRecorder.isTypeSupported('audio/webm')) ? 'audio/webm' : '';
+      mediaRecorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = e => { if(e.data.size > 0) recordedChunks.push(e.data); };
+      mediaRecorder.onstop = function(){
+        audioBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+        stream.getTracks().forEach(t => t.stop());
+        recBtn.classList.remove('stop');
+        recLabel.textContent = 'Start recording';
+        recDot.classList.remove('live');
+        clearInterval(recognizingTimer);
+        filenameEl.textContent = 'Recorded clip ready (' + fmt(seconds) + ') — ' + Math.round(audioBlob.size/1024) + ' KB';
+        analyzeBtn.disabled = false;
+      };
+      mediaRecorder.start();
+      recBtn.classList.add('stop');
+      recLabel.textContent = 'Stop recording';
+      recDot.classList.add('live');
+      seconds = 0; timerEl.textContent = fmt(0);
+      recognizingTimer = setInterval(function(){ seconds++; timerEl.textContent = fmt(seconds); }, 1000);
+    }catch(err){
+      showError('Microphone access was blocked or unavailable. You can upload an audio file instead.');
+    }
+  });
+
+  uploadBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', function(){
+    if(fileInput.files && fileInput.files[0]){
+      audioBlob = fileInput.files[0];
+      filenameEl.textContent = 'File selected: ' + audioBlob.name + ' (' + Math.round(audioBlob.size/1024) + ' KB)';
+      analyzeBtn.disabled = false;
+    }
+  });
+
+  clearBtn.addEventListener('click', function(){
+    audioBlob = null; recordedChunks = [];
+    filenameEl.textContent = '';
+    analyzeBtn.disabled = true;
+    transcriptPanel.style.display = 'none';
+    summaryPanel.style.display = 'none';
+    stageArea.innerHTML = '';
+  });
+
+  function showStage(msg){ stageArea.innerHTML = '<div class="stage"><span class="spinner"></span>' + msg + '</div>'; }
+  function showError(msg){ stageArea.innerHTML = '<div class="error">' + msg + '</div>'; }
+
+  analyzeBtn.addEventListener('click', async function(){
+    if(!apiKey){ showError('Add your AssemblyAI API key above first — it only takes a minute to create a free account.'); return; }
+    if(!audioBlob){ return; }
+    analyzeBtn.disabled = true;
+    transcriptPanel.style.display = 'none';
+    summaryPanel.style.display = 'none';
+
+    try{
+      showStage('Uploading audio to AssemblyAI…');
+      const uploadRes = await fetch('https://api.assemblyai.com/v2/upload', {
+        method: 'POST',
+        headers: { 'authorization': apiKey },
+        body: audioBlob
+      });
+      if(!uploadRes.ok) throw new Error('upload_failed_' + uploadRes.status);
+      const uploadData = await uploadRes.json();
+      const audioUrl = uploadData.upload_url;
+
+      showStage('Requesting transcript, summary & sentiment…');
+      const transcriptRes = await fetch('https://api.assemblyai.com/v2/transcript', {
+        method: 'POST',
+        headers: { 'authorization': apiKey, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          audio_url: audioUrl,
+          summarization: true,
+          summary_model: 'informative',
+          summary_type: 'bullets',
+          auto_highlights: true,
+          sentiment_analysis: true
+        })
+      });
+      if(!transcriptRes.ok) throw new Error('transcript_request_failed_' + transcriptRes.status);
+      const transcriptData = await transcriptRes.json();
+      const id = transcriptData.id;
+
+      let result = null;
+      for(let i = 0; i < 60; i++){
+        await new Promise(r => setTimeout(r, 3000));
+        showStage('Transcribing… (' + (i*3) + 's elapsed)');
+        const pollRes = await fetch('https://api.assemblyai.com/v2/transcript/' + id, {
+          headers: { 'authorization': apiKey }
+        });
+        const pollData = await pollRes.json();
+        if(pollData.status === 'completed'){ result = pollData; break; }
+        if(pollData.status === 'error'){ throw new Error(pollData.error || 'transcription_error'); }
+      }
+      if(!result) throw new Error('timeout');
+
+      transcriptEl.textContent = result.text || '(empty transcript)';
+      confBadge.textContent = result.confidence ? Math.round(result.confidence * 100) + '% confidence' : '';
+      transcriptPanel.style.display = 'block';
+
+      summaryText.textContent = result.summary || 'No summary returned for this clip.';
+
+      chipsEl.innerHTML = '';
+      const highlights = (result.auto_highlights_result && result.auto_highlights_result.results) || [];
+      if(highlights.length){
+        highlights.slice(0, 10).forEach(h => {
+          const chip = document.createElement('span');
+          chip.className = 'chip';
+          chip.textContent = h.text;
+          chipsEl.appendChild(chip);
+        });
+      } else {
+        chipsEl.innerHTML = '<span class="chip" style="opacity:.5">No standout phrases detected</span>';
+      }
+
+      const sentiments = result.sentiment_analysis_results || [];
+      if(sentiments.length){
+        const counts = { POSITIVE: 0, NEGATIVE: 0, NEUTRAL: 0 };
+        sentiments.forEach(s => { counts[s.sentiment] = (counts[s.sentiment]||0) + 1; });
+        const dominant = Object.keys(counts).reduce((a,b) => counts[a] >= counts[b] ? a : b);
+        sentimentText.textContent = 'Overall tone: ' + dominant.charAt(0) + dominant.slice(1).toLowerCase() +
+          ' (' + counts.POSITIVE + ' positive, ' + counts.NEUTRAL + ' neutral, ' + counts.NEGATIVE + ' negative sentences).';
+      } else {
+        sentimentText.textContent = 'Not enough content to score sentiment.';
+      }
+
+      summaryPanel.style.display = 'block';
+      stageArea.innerHTML = '';
+    }catch(err){
+      showError('Something went wrong (' + err.message + '). Double-check your API key and try again — very short clips can also fail summarization.');
+    }finally{
+      analyzeBtn.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>
